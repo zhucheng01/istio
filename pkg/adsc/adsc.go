@@ -43,6 +43,7 @@ import (
 	"istio.io/istio/pkg/config/schema/resource"
 
 	"github.com/envoyproxy/go-control-plane/pkg/conversion"
+	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"github.com/gogo/protobuf/types"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
@@ -121,10 +122,10 @@ type Config struct {
 
 	// TODO: remove the duplication - all security settings belong here.
 	SecOpts *security.Options
-
 	// PlainTLS indicates the use of plain TLS for XDS connection. This will not use client
 	// certificates, but JWT.
 	PlainTLS bool
+	GrpcOpts []grpc.DialOption
 }
 
 // ADSC implements a basic client for ADS, for use in stress tests and tools
@@ -140,6 +141,8 @@ type ADSC struct {
 	nodeID string
 
 	url string
+
+	grpcOpts []grpc.DialOption
 
 	watchTime time.Time
 
@@ -263,6 +266,7 @@ func newADSC(p *v1alpha1.ProxyConfig, opts *Config) *ADSC {
 		sync:              map[string]time.Time{},
 		Sent:              map[string]*discovery.DiscoveryRequest{},
 		initialWatchTypes: []string{},
+		grpcOpts:    opts.GrpcOpts,
 	}
 	if opts.Namespace == "" {
 		opts.Namespace = "default"
@@ -419,30 +423,26 @@ func (a *ADSC) Close() {
 // connect will authenticate and connect to XDS.
 func (a *ADSC) connect() error {
 	var err error
+	opts := a.grpcOpts
 	if a.cfg.PlainTLS || a.cfg.SecOpts.TLSEnabled || len(a.cfg.CertDir) > 0 || a.cfg.Secrets != nil {
 		// Client certificates
 		tlsCfg, err := a.tlsConfig()
 		if err != nil {
 			return err
 		}
-
 		creds := credentials.NewTLS(tlsCfg)
 		opts := []grpc.DialOption{
 			// Verify Pilot cert and service account
 			grpc.WithTransportCredentials(creds),
 			grpc.WithKeepaliveParams(keepalive.ClientParameters{Time: 60 * time.Second}),
 		}
-		a.conn, err = grpc.Dial(a.url, opts...)
-		if err != nil {
-			return err
-		}
 	} else {
-		a.conn, err = grpc.Dial(a.url, grpc.WithInsecure())
-		if err != nil {
-			return err
-		}
+		opts = append(opts, grpc.WithInsecure())
 	}
-
+	a.conn, err = grpc.Dial(a.url, opts...)
+	if err != nil {
+		return err
+	}
 	xds := discovery.NewAggregatedDiscoveryServiceClient(a.conn)
 	a.adsServiceClient = xds
 	edsstr, err := xds.StreamAggregatedResources(context.Background())
@@ -499,8 +499,8 @@ func (a *ADSC) hasSynced() bool {
 		a.mutex.RLock()
 		t := a.Received[k]
 		a.mutex.RUnlock()
-		if t == nil {
-			log.Infoa("Not synced: ", k)
+		if t.IsZero() {
+			log.Warnf("Not synced: %v", s.Resource().GroupVersionKind().String())
 			return false
 		}
 	}
@@ -712,12 +712,12 @@ func (a *ADSC) handleLDS(ll []*listener.Listener) {
 			filter = l.FilterChains[len(l.FilterChains)-2].Filters[0]
 		}
 
-		if filter.Name == "envoy.tcp_proxy" {
+		if filter.Name == wellknown.TCPProxy {
 			lt[l.Name] = l
 			config, _ := conversion.MessageToStruct(filter.GetTypedConfig())
 			c := config.Fields["cluster"].GetStringValue()
 			adscLog.Debugf("TCP: %s -> %s", l.Name, c)
-		} else if filter.Name == "envoy.http_connection_manager" {
+		} else if filter.Name == wellknown.HTTPConnectionManager {
 			lh[l.Name] = l
 
 			// Getting from config is too painful..
@@ -727,11 +727,11 @@ func (a *ADSC) handleLDS(ll []*listener.Listener) {
 			} else {
 				routes = append(routes, fmt.Sprintf("%d", port))
 			}
-		} else if filter.Name == "envoy.mongo_proxy" {
+		} else if filter.Name == wellknown.MongoProxy {
 			// ignore for now
-		} else if filter.Name == "envoy.redis_proxy" {
+		} else if filter.Name == wellknown.RedisProxy {
 			// ignore for now
-		} else if filter.Name == "envoy.filters.network.mysql_proxy" {
+		} else if filter.Name == wellknown.MySQLProxy {
 			// ignore for now
 		} else {
 			tm := &jsonpb.Marshaler{Indent: "  "}
@@ -999,6 +999,14 @@ func (a *ADSC) Wait(to time.Duration, updates ...string) ([]string, error) {
 				delete(want, "eds")
 			case v3.RouteType:
 				delete(want, "rds")
+			case "lds":
+				delete(want, v3.ListenerType)
+			case "cds":
+				delete(want, v3.ClusterType)
+			case "eds":
+				delete(want, v3.EndpointType)
+			case "rds":
+				delete(want, v3.RouteType)
 			}
 			delete(want, toDelete)
 			got = append(got, t)
