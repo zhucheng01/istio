@@ -266,7 +266,7 @@ func newADSC(p *v1alpha1.ProxyConfig, opts *Config) *ADSC {
 		sync:              map[string]time.Time{},
 		Sent:              map[string]*discovery.DiscoveryRequest{},
 		initialWatchTypes: []string{},
-		grpcOpts:    opts.GrpcOpts,
+		grpcOpts:          opts.GrpcOpts,
 	}
 	if opts.Namespace == "" {
 		opts.Namespace = "default"
