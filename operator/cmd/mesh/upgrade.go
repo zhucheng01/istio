@@ -128,7 +128,7 @@ func UpgradeCmd() *cobra.Command {
 
 // upgrade is the main function for Upgrade command
 func upgrade(rootArgs *rootArgs, args *upgradeArgs, l clog.Logger) (err error) {
-	// Create a kube client from args.kubeConfigPath and  args.context
+	// Create a kube client from args.kubeConfigPath and args.context
 	kubeClient, err := NewClient(args.kubeConfigPath, args.context)
 	if err != nil {
 		return fmt.Errorf("failed to connect Kubernetes API server, error: %v", err)
