@@ -1254,6 +1254,7 @@ func validatePortTrafficPolicies(pls []*networking.TrafficPolicy_PortTrafficPoli
 }
 
 // ValidateProxyAddress checks that a network address is well-formed
+// 校验 proxy 的地址代理是否正确
 func ValidateProxyAddress(hostAddr string) error {
 	hostname, p, err := net.SplitHostPort(hostAddr)
 	if err != nil {
@@ -1430,6 +1431,7 @@ func IsNegativeDuration(in time.Duration) error {
 
 // ValidateMeshConfig checks that the mesh config is well-formed
 func ValidateMeshConfig(mesh *meshconfig.MeshConfig) (errs error) {
+	// 端口验证
 	if err := ValidatePort(int(mesh.ProxyListenPort)); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid proxy listen port:"))
 	}
@@ -1491,6 +1493,7 @@ func validateServiceSettings(config *meshconfig.MeshConfig) (errs error) {
 }
 
 // ValidateProxyConfig checks that the mesh config is well-formed
+// 校验 proxy 的规则配置是否正确
 func ValidateProxyConfig(config *meshconfig.ProxyConfig) (errs error) {
 	if config.ConfigPath == "" {
 		errs = multierror.Append(errs, errors.New("config path must be set"))
@@ -1504,6 +1507,7 @@ func ValidateProxyConfig(config *meshconfig.ProxyConfig) (errs error) {
 		errs = multierror.Append(errs, errors.New("service cluster must be set"))
 	}
 
+	// 校验 envoy 的热重启 时间配置是否正确
 	if err := ValidateParentAndDrain(config.DrainDuration, config.ParentShutdownDuration); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid parent and drain time combination"))
 	}
@@ -1517,18 +1521,21 @@ func ValidateProxyConfig(config *meshconfig.ProxyConfig) (errs error) {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid discovery address:"))
 	}
 
+	// 配置 LightStep
 	if tracer := config.GetTracing().GetLightstep(); tracer != nil {
 		if err := ValidateLightstepCollector(tracer); err != nil {
 			errs = multierror.Append(errs, multierror.Prefix(err, "invalid lightstep config:"))
 		}
 	}
 
+	// 配置 Zipkin
 	if tracer := config.GetTracing().GetZipkin(); tracer != nil {
 		if err := ValidateZipkinCollector(tracer); err != nil {
 			errs = multierror.Append(errs, multierror.Prefix(err, "invalid zipkin config:"))
 		}
 	}
 
+	// 配置 DataDog
 	if tracer := config.GetTracing().GetDatadog(); tracer != nil {
 		if err := ValidateDatadogCollector(tracer); err != nil {
 			errs = multierror.Append(errs, multierror.Prefix(err, "invalid datadog config:"))
@@ -1541,6 +1548,7 @@ func ValidateProxyConfig(config *meshconfig.ProxyConfig) (errs error) {
 		}
 	}
 
+	// 验证配置 stats udp 地址
 	if config.StatsdUdpAddress != "" {
 		if err := ValidateProxyAddress(config.StatsdUdpAddress); err != nil {
 			errs = multierror.Append(errs, multierror.Prefix(err, fmt.Sprintf("invalid statsd udp address %q:", config.StatsdUdpAddress)))
@@ -1567,6 +1575,7 @@ func ValidateProxyConfig(config *meshconfig.ProxyConfig) (errs error) {
 		}
 	}
 
+	// 验证配置管理 admin 端口
 	if err := ValidatePort(int(config.ProxyAdminPort)); err != nil {
 		errs = multierror.Append(errs, multierror.Prefix(err, "invalid proxy admin port:"))
 	}

@@ -37,6 +37,7 @@ import (
 
 // return proxyConfig and trustDomain
 func ConstructProxyConfig(meshConfigFile, serviceCluster, proxyConfigEnv string, concurrency int, role *model.Proxy) (*meshconfig.ProxyConfig, error) {
+	// annotation 注解
 	annotations, err := readPodAnnotations()
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -45,6 +46,8 @@ func ConstructProxyConfig(meshConfigFile, serviceCluster, proxyConfigEnv string,
 			log.Warnf("failed to read pod annotations: %v", err)
 		}
 	}
+
+	// mesh configfile 文件
 	var fileMeshContents string
 	if fileExists(meshConfigFile) {
 		contents, err := ioutil.ReadFile(meshConfigFile)
@@ -53,6 +56,8 @@ func ConstructProxyConfig(meshConfigFile, serviceCluster, proxyConfigEnv string,
 		}
 		fileMeshContents = string(contents)
 	}
+
+	// meshconfig 配置文件
 	meshConfig, err := getMeshConfig(fileMeshContents, annotations[annotation.ProxyConfig.Name], proxyConfigEnv)
 	if err != nil {
 		return nil, err
@@ -65,6 +70,7 @@ func ConstructProxyConfig(meshConfigFile, serviceCluster, proxyConfigEnv string,
 	// If concurrency is unset, we will automatically set this based on CPU requests/limits for sidecars.
 	// For gateways, this will use all available CPUs.
 	// If explicitly set concurrency flag, this will be used.
+	// 设置 concurrency 值
 	if concurrency == 0 && role.Type == model.SidecarProxy {
 		byResources := determineConcurrencyOption()
 		if byResources != nil {
@@ -73,9 +79,12 @@ func ConstructProxyConfig(meshConfigFile, serviceCluster, proxyConfigEnv string,
 	} else {
 		proxyConfig.Concurrency = &types.Int32Value{Value: int32(concurrency)}
 	}
+
+	// 服务的名称
 	proxyConfig.ServiceCluster = serviceCluster
 	// resolve statsd address
 	if proxyConfig.StatsdUdpAddress != "" {
+		// ResolveAddr 将授权地址解析为 IP 地址。传入地址可以是 IP 地址或主机名。如果 addr 是 IPv6 地址，则 IP 部分必须用方括号括起来。
 		addr, err := network.ResolveAddr(proxyConfig.StatsdUdpAddress)
 		if err != nil {
 			log.Warnf("resolve StatsdUdpAddress failed: %v", err)
@@ -87,6 +96,7 @@ func ConstructProxyConfig(meshConfigFile, serviceCluster, proxyConfigEnv string,
 	if err := validation.ValidateProxyConfig(&proxyConfig); err != nil {
 		return nil, err
 	}
+	// 配置 pod annotation 上的注解
 	return applyAnnotations(&proxyConfig, annotations), nil
 }
 
@@ -129,6 +139,34 @@ func getMeshConfig(fileOverride, annotationOverride, proxyConfigEnv string) (mes
 		mc = *fileMesh
 	}
 
+	// 2021-06-01T03:00:04.994441Z	info	Apply proxy config from env
+	/**
+	{
+	    "discoveryAddress":"istiod-iop-1-8-4.istio-system.svc:15012",
+	    "tracing":{
+	        "zipkin":{
+	            "address":"jaeger-prod-elasticsearch-collector.mesh:9411"
+	        },
+	        "customTags":{
+	            "mesh":{
+	                "header":{
+	                    "name":"mesh",
+	                    "defaultValue":"mesh"
+	                }
+	            },
+	            "tag_clustername":{
+	                "literal":{
+	                    "value":"axzq-test"
+	                }
+	            }
+	        },
+	        "sampling":100
+	    },
+	    "proxyMetadata":{
+	        "DNS_AGENT":""
+	    }
+	}
+	*/
 	if proxyConfigEnv != "" {
 		log.Infof("Apply proxy config from env %v", proxyConfigEnv)
 		envMesh, err := mesh.ApplyProxyConfig(proxyConfigEnv, mc)
@@ -138,6 +176,7 @@ func getMeshConfig(fileOverride, annotationOverride, proxyConfigEnv string) (mes
 		mc = *envMesh
 	}
 
+	// 注解覆盖
 	if annotationOverride != "" {
 		log.Infof("Apply proxy config from annotation %v", annotationOverride)
 		annotationMesh, err := mesh.ApplyProxyConfig(annotationOverride, mc)
@@ -191,6 +230,7 @@ func applyAnnotations(config *meshconfig.ProxyConfig, annos map[string]string) *
 		if err != nil {
 			log.Errorf("Invalid annotation %v=%v: %v", annotation.SidecarStatusPort, p, err)
 		}
+		// 代理应在其上侦听管理命令（例如就绪探测）的端口。
 		config.StatusPort = int32(p)
 	}
 	return config

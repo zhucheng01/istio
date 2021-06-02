@@ -73,6 +73,7 @@ type Config struct {
 }
 
 // NewServer creates a new STS server.
+// 开启 sts server 服务端
 func NewServer(config Config, tokenManager security.TokenManager) (*Server, error) {
 	s := &Server{
 		tokenManager: tokenManager,
@@ -101,6 +102,7 @@ func NewServer(config Config, tokenManager security.TokenManager) (*Server, erro
 }
 
 // ServeStsRequests handles STS requests and sends exchanged token in responses.
+// 发送 STS 请求，并且交换数据
 func (s *Server) ServeStsRequests(w http.ResponseWriter, req *http.Request) {
 	reqParam, validationError := s.validateStsRequest(req)
 	if validationError != nil {
@@ -123,6 +125,7 @@ func (s *Server) ServeStsRequests(w http.ResponseWriter, req *http.Request) {
 }
 
 // validateStsRequest validates a STS request, and extracts STS parameters from the request.
+// 校验 sts 请求参数以及从请求中获取相关的参数
 func (s *Server) validateStsRequest(req *http.Request) (security.StsRequestParameters, error) {
 	reqParam := security.StsRequestParameters{}
 	if req == nil {

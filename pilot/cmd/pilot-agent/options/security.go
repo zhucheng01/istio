@@ -73,6 +73,7 @@ func SetupSecurityOptions(proxyConfig *meshconfig.ProxyConfig, secOpt *security.
 		log.Info("JWT policy is third-party-jwt")
 		jwtPath = constants.TrustworthyJWTPath
 	} else if jwtPolicy == jwt.PolicyFirstParty {
+		// 2021-06-01T03:00:04.995608Z	info	JWT policy is first-party-jwt
 		log.Info("JWT policy is first-party-jwt")
 		jwtPath = securityModel.K8sSAJwtFileName
 	} else {

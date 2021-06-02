@@ -34,6 +34,7 @@ import (
 )
 
 // DefaultProxyConfig for individual proxies
+// proxy 代理的默认配置
 func DefaultProxyConfig() meshconfig.ProxyConfig {
 	// TODO: include revision based on REVISION env
 	// TODO: set default namespace based on POD_NAMESPACE env
@@ -64,7 +65,10 @@ func DefaultProxyConfig() meshconfig.ProxyConfig {
 
 // DefaultMeshConfig returns the default mesh config.
 // This is merged with values from the mesh config map.
+// 默认的 MeshConfig 配置信息
 func DefaultMeshConfig() meshconfig.MeshConfig {
+
+	// 默认的 proxy 配置信息
 	proxyConfig := DefaultProxyConfig()
 
 	// Defaults matching the standard install
@@ -129,6 +133,7 @@ func extractProxyConfig(yamlText string) (string, error) {
 
 // ApplyMeshConfig returns a new MeshConfig decoded from the
 // input YAML with the provided defaults applied to omitted configuration values.
+// defaultConfig (meshconfig.MeshConfig) 与给的 yaml 文件进行 merge 合并操作
 func ApplyMeshConfig(yaml string, defaultConfig meshconfig.MeshConfig) (*meshconfig.MeshConfig, error) {
 	// We want to keep semantics that all fields are overrides, except proxy config is a merge. This allows
 	// decent customization while also not requiring users to redefine the entire proxy config if they want to override
@@ -144,6 +149,7 @@ func ApplyMeshConfig(yaml string, defaultConfig meshconfig.MeshConfig) (*meshcon
 	defaultConfig.DefaultConfig = prevProxyConfig
 
 	// Get just the proxy config yaml
+	// 从配置中读取文件，进行赋值操作
 	pc, err := extractProxyConfig(yaml)
 	if err != nil {
 		return nil, multierror.Prefix(err, "failed to extract proxy config")
@@ -155,6 +161,7 @@ func ApplyMeshConfig(yaml string, defaultConfig meshconfig.MeshConfig) (*meshcon
 		}
 	}
 
+	// 进行各种规则校验
 	if err := validation.ValidateMeshConfig(&defaultConfig); err != nil {
 		return nil, err
 	}

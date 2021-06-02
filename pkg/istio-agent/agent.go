@@ -96,6 +96,7 @@ type Agent struct {
 // Most are from env variables ( still experimental ) or for testing only.
 // Eventually most non-test settings should graduate to ProxyConfig
 // Please don't add 100 parameters to the NewAgent function (or any other)!
+// TODO 看到这里，标记下
 type AgentOptions struct {
 	// ProxyXDSViaAgent if true will enable a local XDS proxy that will simply
 	// ferry Envoy's XDS requests to istiod and responses back to envoy
@@ -139,6 +140,7 @@ type AgentOptions struct {
 // NewAgent hosts the functionality for local SDS and XDS. This consists of the local SDS server and
 // associated clients to sign certificates (when not using files), and the local XDS proxy (including
 // health checking for VMs and DNS proxying).
+// NewAgent 托管本地 SDS 和 XDS 的功能。这包括本地 SDS 服务器和关联客户端签署证书（不使用文件时），以及本地 XDS 代理（包括 VM 和 DNS 代理的健康检查）。
 func NewAgent(proxyConfig *mesh.ProxyConfig, agentOpts *AgentOptions, sopts *security.Options) *Agent {
 	return &Agent{
 		proxyConfig: proxyConfig,
@@ -319,6 +321,7 @@ func (a *Agent) newSecretManager() (*cache.SecretManagerClient, error) {
 		} else if rootCert, err = ioutil.ReadFile(caCertFile); err != nil {
 			log.Fatalf("invalid config - %s missing a root certificate %s", a.secOpts.CAEndpoint, caCertFile)
 		} else {
+			// 	Using CA istiod-iop-1-8-4.istio-system.svc:15012 cert with certs: var/run/secrets/istio/root-cert.pem
 			log.Infof("Using CA %s cert with certs: %s", a.secOpts.CAEndpoint, caCertFile)
 		}
 	}

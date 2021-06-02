@@ -82,6 +82,7 @@ var (
 		},
 	}
 
+	// 代理 proxy 的命令
 	proxyCmd = &cobra.Command{
 		Use:   "proxy",
 		Short: "Envoy proxy agent",
@@ -91,13 +92,37 @@ var (
 		},
 		PersistentPreRunE: configureLogging,
 		RunE: func(c *cobra.Command, args []string) error {
+			/*  输出参数如下所示：
+			2021-06-01T03:00:04.993946Z	info	FLAG: --concurrency="2"
+			2021-06-01T03:00:04.993970Z	info	FLAG: --domain="dev.svc.cluster.local"
+			2021-06-01T03:00:04.993975Z	info	FLAG: --help="false"
+			2021-06-01T03:00:04.993978Z	info	FLAG: --log_as_json="false"
+			2021-06-01T03:00:04.993980Z	info	FLAG: --log_caller=""
+			2021-06-01T03:00:04.993983Z	info	FLAG: --log_output_level="default:info"
+			2021-06-01T03:00:04.993985Z	info	FLAG: --log_rotate=""
+			2021-06-01T03:00:04.993987Z	info	FLAG: --log_rotate_max_age="30"
+			2021-06-01T03:00:04.993996Z	info	FLAG: --log_rotate_max_backups="1000"
+			2021-06-01T03:00:04.993999Z	info	FLAG: --log_rotate_max_size="104857600"
+			2021-06-01T03:00:04.994001Z	info	FLAG: --log_stacktrace_level="default:none"
+			2021-06-01T03:00:04.994009Z	info	FLAG: --log_target="[stdout]"
+			2021-06-01T03:00:04.994013Z	info	FLAG: --meshConfig="./etc/istio/config/mesh"
+			2021-06-01T03:00:04.994016Z	info	FLAG: --outlierLogPath=""
+			2021-06-01T03:00:04.994020Z	info	FLAG: --proxyComponentLogLevel="misc:error"
+			2021-06-01T03:00:04.994023Z	info	FLAG: --proxyLogLevel="warning"
+			2021-06-01T03:00:04.994027Z	info	FLAG: --serviceCluster="sleep.dev"
+			2021-06-01T03:00:04.994030Z	info	FLAG: --stsPort="0"
+			2021-06-01T03:00:04.994037Z	info	FLAG: --templateFile=""
+			2021-06-01T03:00:04.994041Z	info	FLAG: --tokenManagerPlugin="GoogleTokenExchange"
+			*/
 			cmd.PrintFlags(c.Flags())
+			// 2021-06-01T03:00:04.994051Z	info	Version 1.8.4-97e10d79b8b5b32be0f92175586a4e11c466e640-Clean
 			log.Infof("Version %s", version.Info.String())
 
 			proxy, err := initProxy(args)
 			if err != nil {
 				return err
 			}
+			// 生成 proxy 的配置信息
 			proxyConfig, err := config.ConstructProxyConfig(meshConfigFile, serviceCluster, options.ProxyConfigEnv, concurrency, proxy)
 			if err != nil {
 				return fmt.Errorf("failed to get proxy config: %v", err)
@@ -105,9 +130,40 @@ var (
 			if out, err := gogoprotomarshal.ToYAML(proxyConfig); err != nil {
 				log.Infof("Failed to serialize to YAML: %v", err)
 			} else {
+				/**
+				2021-06-01T03:00:04.995562Z	info	Effective config: binaryPath: /usr/local/bin/envoy
+				concurrency: 2
+				configPath: ./etc/istio/proxy
+				controlPlaneAuthPolicy: MUTUAL_TLS
+				discoveryAddress: istiod-iop-1-8-4.istio-system.svc:15012
+				drainDuration: 45s
+				envoyAccessLogService: {}
+				envoyMetricsService: {}
+				parentShutdownDuration: 60s
+				proxyAdminPort: 15000
+				proxyMetadata:
+				  DNS_AGENT: ""
+				serviceCluster: sleep.dev
+				statNameLength: 189
+				statusPort: 15020
+				terminationDrainDuration: 5s
+				tracing:
+				  customTags:
+				    mesh:
+				      header:
+				        defaultValue: mesh
+				        name: mesh
+				    tag_clustername:
+				      literal:
+				        value: axzq-test
+				  sampling: 100
+				  zipkin:
+				    address: jaeger-prod-elasticsearch-collector.mesh:9411
+				*/
 				log.Infof("Effective config: %s", out)
 			}
 
+			// 配置安全策略
 			secOpts, err := options.NewSecurityOptions(proxyConfig, stsPort, tokenManagerPlugin)
 			if err != nil {
 				return err
@@ -117,6 +173,7 @@ var (
 			// listen on STS port for STS requests. For STS, see
 			// https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-16.
 			// STS is used for stackdriver or other Envoy services using google gRPC.
+			// 开启 STS 的 grpc server
 			if stsPort > 0 {
 				stsServer, err := initStsServer(proxy, secOpts.TokenManager)
 				if err != nil {
@@ -131,10 +188,13 @@ var (
 				// Obtain Pilot SAN, using DNS.
 				pilotSAN = []string{config.GetPilotSan(proxyConfig.DiscoveryAddress)}
 			}
+
+			// 2021-06-01T03:00:04.995639Z	info	PilotSAN []string{"istiod-iop-1-8-4.istio-system.svc"}
 			log.Infof("Pilot SAN: %v", pilotSAN)
 
 			agent := istio_agent.NewAgent(proxyConfig, agentOptions, secOpts)
 			// Start in process SDS, dns server, and xds proxy.
+			// 在进程中启动 SDS、dns 服务器和 xds 代理。
 			if err := agent.Start(); err != nil {
 				log.Fatala("Agent start up error", err)
 			}
@@ -279,6 +339,9 @@ func configureLogging(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
+/**
+初始化参数
+*/
 func initProxy(args []string) (*model.Proxy, error) {
 	proxy := &model.Proxy{
 		Type: model.SidecarProxy,
