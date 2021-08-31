@@ -43,11 +43,11 @@ func TestMain(m *testing.M) {
 		Run()
 }
 
-func TestMulticlusterReachability(t *testing.T) {
+func TestMultiClusterReachability(t *testing.T) {
 	multicluster.ReachabilityTest(t, appCtx, "installation.multicluster.multimaster", "installation.multicluster.remote")
 }
 
-func TestCrossClusterLoadbalancing(t *testing.T) {
+func TestCrossClusterLoadBalancing(t *testing.T) {
 	multicluster.LoadbalancingTest(t, appCtx, "installation.multicluster.multimaster", "installation.multicluster.remote")
 }
 
